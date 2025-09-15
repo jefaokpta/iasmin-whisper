@@ -41,7 +41,7 @@ Exemplo de payload CDR (mensagem no Kafka):
   "peer": "21",
   "src": "1154201020",
   "destination": "1935002560",
-  "callerId": "\"Rogerio Libreti\" <1154201020>",
+  "callerId": "\"Fulano Silva\" <11912345678>",
   "duration": 11,
   "billableSeconds": 7,
   "uniqueId": "1757620718.2770",
@@ -103,9 +103,9 @@ Variáveis principais (com defaults do `application.yml`):
 Exemplo de `.env` (já presente):
 ```
 WHISPER_COMMAND=/opt/whisper-api/venv/bin/whisper
-IASMIN_PABX_URL=https://iasmin-pabx.vipsolutions.com.br/static
+IASMIN_PABX_URL=https://iasmin.com.br/static
 IASMIN_BACKEND_URL=https://iasmin-5bffa268e5ef.herokuapp.com
-VEIA_KAFKA_BROKER=veia.vipsolutions.com.br:9094
+VEIA_KAFKA_BROKER=veia.com.br:9094
 ```
 
 Para shells compatíveis, você pode carregar o `.env` antes de rodar:

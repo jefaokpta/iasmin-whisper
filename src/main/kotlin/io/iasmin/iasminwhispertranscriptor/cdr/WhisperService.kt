@@ -12,6 +12,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 /**
  * Serviço responsável por interagir com o Whisper e utilidades correlatas.
@@ -90,8 +91,11 @@ class WhisperService(
      */
     private fun transcriptAudio(cdr: Cdr) {
         try {
-            val path = downloadAudio(cdr)
-            logger.info("Arquivo pronto para transcrição: {} (uniqueId={})", path, cdr.uniqueId)
+            TimeUnit.MINUTES.sleep(1)
+            logger.info("Transcrição finalizada: {}", cdr.uniqueId)
+            isBusy = false
+//            val path = downloadAudio(cdr)
+//            logger.info("Arquivo pronto para transcrição: {} (uniqueId={})", path, cdr.uniqueId)
             // Próximos passos (fora do escopo atual):
             // - Executar whisper com o comando configurado
             // - Ler JSON de saída e enviar para backend
