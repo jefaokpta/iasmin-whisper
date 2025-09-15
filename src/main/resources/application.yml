@@ -1,0 +1,20 @@
+spring:
+  threads:
+    virtual:
+      enabled: true
+  kafka:
+    bootstrap-servers: ${VEIA_KAFKA_BROKER:localhost:9092}
+
+server:
+  error:
+    include-message: always # on-param
+    include-stacktrace: on_param
+
+iasmin:
+  pabx:
+    url: ${IASMIN_PABX_URL:http://localhost:8080}
+  backend:
+    url: ${IASMIN_BACKEND_URL:http://localhost:8081}
+
+whisper:
+  command: ${WHISPER_COMMAND:whisper}
