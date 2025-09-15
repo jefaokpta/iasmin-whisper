@@ -4,6 +4,10 @@ spring:
       enabled: true
   kafka:
     bootstrap-servers: ${VEIA_KAFKA_BROKER:localhost:9092}
+    consumer:
+      group-id: iasmin-whisper-consumer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 server:
   error:
