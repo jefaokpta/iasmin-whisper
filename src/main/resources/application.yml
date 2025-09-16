@@ -11,6 +11,7 @@ spring:
       max-poll-records: 1
     listener:
       concurrency: 1
+      ack-mode: manual_immediate
 
 server:
   error:

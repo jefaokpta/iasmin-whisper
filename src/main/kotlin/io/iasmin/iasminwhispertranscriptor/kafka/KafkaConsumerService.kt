@@ -8,6 +8,7 @@ import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.HttpMethod
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
+import org.springframework.kafka.support.Acknowledgment
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import java.net.URI
@@ -27,10 +28,11 @@ import java.util.concurrent.TimeUnit
  */
 @Service
 class KafkaConsumerService(
-    @param:Value("\${iasmin.pabx.url}") private val pabxBaseUrl: String,
+    @param:Value("\${iasmin.pabx.url}")
+    private val pabxBaseUrl: String,
+    @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry
 ) {
-
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val restTemplate = RestTemplateBuilder()
         .connectTimeout(Duration.ofSeconds(5))
@@ -38,7 +40,7 @@ class KafkaConsumerService(
         .build()
 
     @KafkaListener(id = "whisper-consumer", topics = ["transcriptions-test"], groupId = "iasmin-whisper-consumer")
-    fun manageTask(@Payload message: String) {
+    fun manageTask(@Payload message: String, ack: Acknowledgment) {
         val cdr = jacksonObjectMapper().readValue(message, Cdr::class.java)
         logger.info(
             "Parsed CDR: id={}, uniqueId={}, callRecord={}, userfield={}, devInstance={}",
@@ -48,8 +50,9 @@ class KafkaConsumerService(
         try {
             container.pause()
             transcriptAudio(cdr)
+            ack.acknowledge()
         } catch (e: Exception) {
-            logger.error("Failed to pause Kafka consumer", e)
+            logger.error("Falha ao processar mensagem do Kafka ${cdr.uniqueId}", e)
         } finally {
             container.resume()
         }
