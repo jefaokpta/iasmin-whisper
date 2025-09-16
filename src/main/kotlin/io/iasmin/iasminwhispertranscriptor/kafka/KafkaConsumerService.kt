@@ -8,7 +8,6 @@ import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.HttpMethod
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
-import org.springframework.kafka.support.Acknowledgment
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import java.net.URI
@@ -40,7 +39,7 @@ class KafkaConsumerService(
         .build()
 
     @KafkaListener(id = "whisper-consumer", topics = ["transcriptions-test"], groupId = "iasmin-whisper-consumer")
-    fun manageTask(@Payload message: String, ack: Acknowledgment) {
+    fun manageTask(@Payload message: String) {
         val cdr = jacksonObjectMapper().readValue(message, Cdr::class.java)
         logger.info(
             "Parsed CDR: id={}, uniqueId={}, callRecord={}, userfield={}, devInstance={}",
@@ -50,7 +49,6 @@ class KafkaConsumerService(
         try {
             container.pause()
             transcriptAudio(cdr)
-            ack.acknowledge()
         } catch (e: Exception) {
             logger.error("Falha ao processar mensagem do Kafka ${cdr.uniqueId}", e)
         } finally {
