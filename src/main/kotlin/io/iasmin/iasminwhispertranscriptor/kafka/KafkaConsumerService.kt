@@ -28,17 +28,19 @@ import java.util.concurrent.TimeUnit
 @Service
 class KafkaConsumerService(
     @param:Value("\${iasmin.pabx.url}")
-    private val pabxBaseUrl: String,
+    private val IASMIN_PABX_URL: String,
+    @param:Value("\${iasmin.backend.url}")
+    private val IASMIN_BACKEND_URL: String,
     @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val restTemplate = RestTemplateBuilder()
-        .connectTimeout(Duration.ofSeconds(5))
-        .readTimeout(Duration.ofSeconds(10))
+        .connectTimeout(Duration.ofSeconds(2))
+        .readTimeout(Duration.ofSeconds(8))
         .build()
 
-    @KafkaListener(id = "whisper-consumer", topics = ["transcriptions-test"], groupId = "iasmin-whisper-consumer")
+    @KafkaListener(id = "whisper-consumer", topics = ["\${kafka.topic}"], groupId = "iasmin-whisper-consumer")
     fun manageTask(@Payload message: String) {
         val cdr = jacksonObjectMapper().readValue(message, Cdr::class.java)
         logger.info(
@@ -54,6 +56,22 @@ class KafkaConsumerService(
         } finally {
             container.resume()
         }
+    }
+    /**
+     * Fluxo de transcrição (WIP): por enquanto apenas baixa o áudio necessário.
+     */
+    private fun transcriptAudio(cdr: Cdr) {
+        TimeUnit.MINUTES.sleep(5)
+        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
+//            val path = downloadAudio(cdr)
+//            logger.info("Arquivo pronto para transcrição: {} (uniqueId={})", path, cdr.uniqueId)
+        // Próximos passos (fora do escopo atual):
+        // - Executar whisper com o comando configurado
+        // - Ler JSON de saída e enviar para backend
+    }
+
+    private fun alreadyTranscribed(cdr: Cdr): Boolean {
+        return Files.exists(Paths.get("audios/${cdr.uniqueId}.json"))
     }
 
     /**
@@ -77,7 +95,7 @@ class KafkaConsumerService(
         }
 
         val finalUrl = buildString {
-            append(pabxBaseUrl.trimEnd('/'))
+            append(IASMIN_PABX_URL.trimEnd('/'))
             append("/")
             append(fileName)
         }
@@ -97,16 +115,5 @@ class KafkaConsumerService(
         return targetPath.toAbsolutePath()
     }
 
-    /**
-     * Fluxo de transcrição (WIP): por enquanto apenas baixa o áudio necessário.
-     */
-    private fun transcriptAudio(cdr: Cdr) {
-        TimeUnit.MINUTES.sleep(5)
-        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
-//            val path = downloadAudio(cdr)
-//            logger.info("Arquivo pronto para transcrição: {} (uniqueId={})", path, cdr.uniqueId)
-        // Próximos passos (fora do escopo atual):
-        // - Executar whisper com o comando configurado
-        // - Ler JSON de saída e enviar para backend
-    }
+
 }

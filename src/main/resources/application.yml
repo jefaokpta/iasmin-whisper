@@ -3,9 +3,8 @@ spring:
     virtual:
       enabled: true
   kafka:
-    bootstrap-servers: ${VEIA_KAFKA_BROKER:localhost:9092}
+    bootstrap-servers: ${KAFKA_BROKER:localhost:9094}
     consumer:
-      group-id: iasmin-whisper-consumer
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       max-poll-records: 1
@@ -25,3 +24,6 @@ iasmin:
 
 whisper:
   command: ${WHISPER_COMMAND:whisper}
+
+kafka:
+  topic: ${KAFKA_TOPIC:whisper}
