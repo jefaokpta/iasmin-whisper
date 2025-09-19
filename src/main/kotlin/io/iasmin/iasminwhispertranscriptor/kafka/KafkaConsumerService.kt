@@ -13,6 +13,7 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
@@ -65,20 +66,30 @@ class KafkaConsumerService(
             container.resume()
         }
     }
-    /**
-     * Fluxo de transcrição (WIP): por enquanto apenas baixa o áudio necessário.
-     */
+
     private fun transcriptAudio(cdr: Cdr) {
         val audioNameA = cdr.uniqueId.replace(".", "-").plus("-a.sln")
         val audioNameB = cdr.uniqueId.replace(".", "-").plus("-b.sln")
         downloadAudio(audioNameA)
         downloadAudio(audioNameB)
-        // - Executar whisper com o comando configurado
-//        whisper(audioNameA)
-        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
+        whisper(audioNameA)
+        whisper(audioNameB)
         // - Ler JSON de saída e enviar para backend
+        readTranscriptions(cdr)
+        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
         // apagar dados no fim
 //        clearAudioData(audioNameA, audioNameB)
+    }
+
+    private fun readTranscriptions(cdr: Cdr) {
+        val transcriptionA = cdr.uniqueId.replace(".", "-").plus("-a.json")
+        val transcriptionB = cdr.uniqueId.replace(".", "-").plus("-b.json")
+        val transcriptionPath = Paths.get("transcriptions/$transcriptionA")
+        if (!Files.exists(transcriptionPath)) {
+            throw FileNotFoundException("Transcrição não encontrada para chamada ${cdr.uniqueId}")
+        }
+        val segmentA = jacksonObjectMapper().readValue(Files.readString(transcriptionPath), Segment::class.java)
+        val segmentB = jacksonObjectMapper().readValue(Files.readString(transcriptionPath), Segment::class.java)
     }
 
     private fun clearAudioData(audioNameA: String, audioNameB: String) {
@@ -102,10 +113,10 @@ class KafkaConsumerService(
         }
     }
 
-    private fun whisper(cdr: Cdr) {
+    private fun whisper(audioName: String) {
         val command = listOf(
             WHISPER_COMMAND,
-            "audios/${cdr.callRecord}",
+            "audios/$audioName",
             "--model=turbo",
             "--fp16=False",
             "--language=pt",

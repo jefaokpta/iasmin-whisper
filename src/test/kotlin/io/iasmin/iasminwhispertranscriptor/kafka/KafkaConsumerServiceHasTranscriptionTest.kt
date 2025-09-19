@@ -29,6 +29,7 @@ class KafkaConsumerServiceHasTranscriptionTest {
         val service = KafkaConsumerService(
             IASMIN_PABX_URL = "http://example",
             IASMIN_BACKEND_URL = backendUrl,
+            WHISPER_COMMAND = "whisper",
             kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java)
         )
         val cdr = Cdr(id = 1, uniqueId = uniqueId, callRecord = "file.mp3", userfield = UserfieldEnum.OUTBOUND)
@@ -45,6 +46,7 @@ class KafkaConsumerServiceHasTranscriptionTest {
         val service = KafkaConsumerService(
             IASMIN_PABX_URL = "http://example",
             IASMIN_BACKEND_URL = backendUrl,
+            WHISPER_COMMAND = "whisper",
             kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java)
         )
         val cdr = Cdr(id = 2, uniqueId = uniqueId, callRecord = "file2.mp3", userfield = UserfieldEnum.INBOUND)
