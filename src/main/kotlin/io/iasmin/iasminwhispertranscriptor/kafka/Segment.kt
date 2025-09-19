@@ -6,11 +6,10 @@ package io.iasmin.iasminwhispertranscriptor.kafka
  */
 class Segment(
     val id: Int,
-    val segmentId: Int,
     val text: String,
     val seek: Int,
-    val startSecond: Int,
-    val endSecond: Int,
+    val start: String,
+    val end: String,
     val callLeg: CallLegEnum?
 ) {
 }

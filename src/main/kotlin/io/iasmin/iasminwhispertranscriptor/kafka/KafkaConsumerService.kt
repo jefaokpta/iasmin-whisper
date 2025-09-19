@@ -118,8 +118,8 @@ class KafkaConsumerService(
     }
 
     private fun whisper(audioName: String) {
-        val command = listOf(
-            WHISPER_COMMAND,
+        val command = WHISPER_COMMAND.split(" ").toTypedArray().toMutableList()
+        val params = listOf(
             "audios/$audioName",
             "--model=turbo",
             "--fp16=False",
@@ -131,10 +131,11 @@ class KafkaConsumerService(
             "--output_format=json",
             "--output_dir=transcripts"
         )
-        val process = ProcessBuilder(command)
+        command.addAll(params)
+        ProcessBuilder(command)
             .directory(Paths.get("whisper").toFile())
             .start()
-        process.waitFor()
+            .waitFor()
     }
 
     /**
