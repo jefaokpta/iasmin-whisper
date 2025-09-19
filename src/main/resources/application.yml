@@ -24,6 +24,8 @@ iasmin:
 
 whisper:
   command: ${WHISPER_COMMAND:whisper}
+  audios: ${WHISPER_AUDIOS:audio}
+  transcripts: ${WHISPER_TRANSCRIPTS:transcripts}
 
 kafka:
   topic: ${KAFKA_TOPIC:whisper}

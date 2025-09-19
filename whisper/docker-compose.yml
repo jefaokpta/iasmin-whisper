@@ -1,0 +1,17 @@
+services:
+  whisper:
+    build: .
+    volumes:
+      - ./audios:/data/audios
+      - ./transcripts:/data/transcripts
+      - ./models:/root/.cache/whisper
+    # Default command that can be overridden when running the container
+    command: bash
+    # Enable if you have a CUDA-capable GPU
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

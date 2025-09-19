@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import java.net.InetSocketAddress
+import java.nio.file.Paths
 import kotlin.test.assertFalse
 
 class KafkaConsumerServiceHasTranscriptionTest {
@@ -30,7 +31,9 @@ class KafkaConsumerServiceHasTranscriptionTest {
             IASMIN_PABX_URL = "http://example",
             IASMIN_BACKEND_URL = backendUrl,
             WHISPER_COMMAND = "whisper",
-            kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java)
+            kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
+            WHISPER_AUDIOS = "whisper/audios",
+            WHISPER_TRANSCRIPTS = "whisper/transcripts"
         )
         val cdr = Cdr(id = 1, uniqueId = uniqueId, callRecord = "file.mp3", userfield = UserfieldEnum.OUTBOUND)
 
@@ -47,12 +50,38 @@ class KafkaConsumerServiceHasTranscriptionTest {
             IASMIN_PABX_URL = "http://example",
             IASMIN_BACKEND_URL = backendUrl,
             WHISPER_COMMAND = "whisper",
-            kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java)
+            kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
+            WHISPER_AUDIOS = "whisper/audios",
+            WHISPER_TRANSCRIPTS = "whisper/transcripts"
         )
         val cdr = Cdr(id = 2, uniqueId = uniqueId, callRecord = "file2.mp3", userfield = UserfieldEnum.INBOUND)
 
         val status = invokeHasTranscription(service, cdr)
         assertFalse(status)
+    }
+
+    @Test
+    fun `executar docker compose`() {
+        val WHISPER_COMMAND = "docker compose run --rm whisper whisper"
+        val command = listOf(
+            WHISPER_COMMAND,
+            "-h"
+//            "audios/$audioName",
+//            "--model=turbo",
+//            "--fp16=False",
+//            "--language=pt",
+//            "--beam_size=5",
+//            "--patience=2",
+//            "--word_timestamps=True",
+//            "--hallucination_silence_threshold=3",
+//            "--output_format=json",
+//            "--output_dir=transcripts"
+        )
+        val process = ProcessBuilder(command)
+            .directory(Paths.get("whisper").toFile())
+            .start()
+        process.waitFor()
+
     }
 
     private fun invokeHasTranscription(service: KafkaConsumerService, cdr: Cdr): Boolean {

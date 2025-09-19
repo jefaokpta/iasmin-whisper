@@ -13,7 +13,6 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
-import java.io.FileNotFoundException
 import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
@@ -36,6 +35,10 @@ class KafkaConsumerService(
     private val IASMIN_BACKEND_URL: String,
     @param:Value("\${whisper.command}")
     private val WHISPER_COMMAND: String,
+    @param:Value("\${whisper.audios}")
+    private val WHISPER_AUDIOS: String,
+    @param:Value("\${whisper.transcripts}")
+    private val WHISPER_TRANSCRIPTS: String,
     @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry
 ) {
@@ -84,20 +87,21 @@ class KafkaConsumerService(
     private fun readTranscriptions(cdr: Cdr) {
         val transcriptionA = cdr.uniqueId.replace(".", "-").plus("-a.json")
         val transcriptionB = cdr.uniqueId.replace(".", "-").plus("-b.json")
-        val transcriptionPath = Paths.get("transcriptions/$transcriptionA")
-        if (!Files.exists(transcriptionPath)) {
-            throw FileNotFoundException("Transcrição não encontrada para chamada ${cdr.uniqueId}")
-        }
-        val segmentA = jacksonObjectMapper().readValue(Files.readString(transcriptionPath), Segment::class.java)
-        val segmentB = jacksonObjectMapper().readValue(Files.readString(transcriptionPath), Segment::class.java)
+        val transcriptionAPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionA")
+        val transcriptionBPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionB")
+        val segmentA = jacksonObjectMapper().readValue(Files.readString(transcriptionAPath), Segment::class.java)
+        val segmentB = jacksonObjectMapper().readValue(Files.readString(transcriptionBPath), Segment::class.java)
+        logger.info("Transcrição lida: {}", cdr.uniqueId)
+        logger.info("Segmento A: {}", segmentA)
+        logger.info("Segmento B: {}", segmentB)
     }
 
     private fun clearAudioData(audioNameA: String, audioNameB: String) {
         try {
-            Files.deleteIfExists(Paths.get("audios/$audioNameA"))
-            Files.deleteIfExists(Paths.get("audios/$audioNameB"))
-            Files.deleteIfExists(Paths.get("transcriptions/$audioNameA"))
-            Files.deleteIfExists(Paths.get("transcriptions/$audioNameB"))
+            Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameA"))
+            Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameB"))
+            Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameA"))
+            Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameB"))
         } catch (e: IOException) {
             logger.error("Erro ao apagar arquivos de transcrição: {}", e.message)
         }
@@ -122,10 +126,14 @@ class KafkaConsumerService(
             "--language=pt",
             "--beam_size=5",
             "--patience=2",
+            "--word_timestamps=True",
+            "--hallucination_silence_threshold=3",
             "--output_format=json",
-            "--output_dir=transcriptions"
+            "--output_dir=transcripts"
         )
-        val process = ProcessBuilder(command).start()
+        val process = ProcessBuilder(command)
+            .directory(Paths.get("whisper").toFile())
+            .start()
         process.waitFor()
     }
 
@@ -139,10 +147,8 @@ class KafkaConsumerService(
      * @return Path absoluto do arquivo salvo
      */
     private fun downloadAudio(audioName: String) {
-        val audioDirectory = Paths.get("audios")
+        val audioDirectory = Paths.get(WHISPER_AUDIOS)
         Files.createDirectories(audioDirectory)
-        val transcriptionDirectory = Paths.get("transcriptions")
-        Files.createDirectories(transcriptionDirectory)
         val audioFilePath = audioDirectory.resolve(audioName)
 
         val fullAudioUrl = buildString {
