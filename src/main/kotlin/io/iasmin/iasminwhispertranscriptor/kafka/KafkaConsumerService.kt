@@ -89,11 +89,13 @@ class KafkaConsumerService(
         val transcriptionB = cdr.uniqueId.replace(".", "-").plus("-b.json")
         val transcriptionAPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionA")
         val transcriptionBPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionB")
-        val segmentA = jacksonObjectMapper().readValue(Files.readString(transcriptionAPath), Segment::class.java)
-        val segmentB = jacksonObjectMapper().readValue(Files.readString(transcriptionBPath), Segment::class.java)
+        val jsonA = Files.readString(transcriptionAPath)
+        val jsonB = Files.readString(transcriptionBPath)
+        val segmentsA = Segment.fromWhisperJson(jsonA, CallLegEnum.A)
+        val segmentsB = Segment.fromWhisperJson(jsonB, CallLegEnum.B)
         logger.info("Transcrição lida: {}", cdr.uniqueId)
-        logger.info("Segmento A: {}", segmentA)
-        logger.info("Segmento B: {}", segmentB)
+        logger.info("Segmentos A: {}", segmentsA.size)
+        logger.info("Segmentos B: {}", segmentsB.size)
     }
 
     private fun clearAudioData(audioNameA: String, audioNameB: String) {
