@@ -6,10 +6,13 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
+import org.springframework.http.RequestEntity
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
+import org.springframework.web.client.HttpClientErrorException
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -36,7 +39,7 @@ class KafkaConsumerService(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val restTemplate = RestTemplateBuilder()
-        .connectTimeout(Duration.ofSeconds(2))
+        .connectTimeout(Duration.ofSeconds(4))
         .readTimeout(Duration.ofSeconds(8))
         .build()
 
@@ -47,6 +50,10 @@ class KafkaConsumerService(
             "Parsed CDR: id={}, uniqueId={}, callRecord={}, userfield={}, devInstance={}",
             cdr.id, cdr.uniqueId, cdr.callRecord, cdr.userfield, cdr.isDeveloperInstance
         )
+        if (hasTranscription(cdr)) {
+            logger.info("CDR ${cdr.uniqueId} ja tem transcricao, ignorando...")
+            return
+        }
         val container = kafkaListenerEndpointRegistry.getListenerContainer("whisper-consumer")!!
         try {
             container.pause()
@@ -70,8 +77,14 @@ class KafkaConsumerService(
         // - Ler JSON de saída e enviar para backend
     }
 
-    private fun alreadyTranscribed(cdr: Cdr): Boolean {
-        return Files.exists(Paths.get("audios/${cdr.uniqueId}.json"))
+    private fun hasTranscription(cdr: Cdr): Boolean {
+        try {
+            val request = RequestEntity.get(URI("$IASMIN_BACKEND_URL/recognitions/${cdr.uniqueId}")).build()
+            val response = restTemplate.exchange(request, Void::class.java)
+            return response.statusCode == HttpStatus.OK
+        } catch (e: HttpClientErrorException) {
+            return false
+        }
     }
 
     /**
