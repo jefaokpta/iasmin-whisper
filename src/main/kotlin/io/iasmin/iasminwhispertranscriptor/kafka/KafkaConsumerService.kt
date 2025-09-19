@@ -13,13 +13,12 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
+import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 /**
  * Serviço responsável por interagir com o Kafka e utilidades correlatas.
@@ -34,6 +33,8 @@ class KafkaConsumerService(
     private val IASMIN_PABX_URL: String,
     @param:Value("\${iasmin.backend.url}")
     private val IASMIN_BACKEND_URL: String,
+    @param:Value("\${whisper.command}")
+    private val WHISPER_COMMAND: String,
     @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry
 ) {
@@ -68,13 +69,27 @@ class KafkaConsumerService(
      * Fluxo de transcrição (WIP): por enquanto apenas baixa o áudio necessário.
      */
     private fun transcriptAudio(cdr: Cdr) {
-        TimeUnit.MINUTES.sleep(5)
-        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
-//            val path = downloadAudio(cdr)
-//            logger.info("Arquivo pronto para transcrição: {} (uniqueId={})", path, cdr.uniqueId)
-        // Próximos passos (fora do escopo atual):
+        val audioNameA = cdr.uniqueId.replace(".", "-").plus("-a.sln")
+        val audioNameB = cdr.uniqueId.replace(".", "-").plus("-b.sln")
+        downloadAudio(audioNameA)
+        downloadAudio(audioNameB)
         // - Executar whisper com o comando configurado
+//        whisper(audioNameA)
+        logger.info("Transcrição finalizada: {}", cdr.uniqueId)
         // - Ler JSON de saída e enviar para backend
+        // apagar dados no fim
+//        clearAudioData(audioNameA, audioNameB)
+    }
+
+    private fun clearAudioData(audioNameA: String, audioNameB: String) {
+        try {
+            Files.deleteIfExists(Paths.get("audios/$audioNameA"))
+            Files.deleteIfExists(Paths.get("audios/$audioNameB"))
+            Files.deleteIfExists(Paths.get("transcriptions/$audioNameA"))
+            Files.deleteIfExists(Paths.get("transcriptions/$audioNameB"))
+        } catch (e: IOException) {
+            logger.error("Erro ao apagar arquivos de transcrição: {}", e.message)
+        }
     }
 
     private fun hasTranscription(cdr: Cdr): Boolean {
@@ -87,6 +102,22 @@ class KafkaConsumerService(
         }
     }
 
+    private fun whisper(cdr: Cdr) {
+        val command = listOf(
+            WHISPER_COMMAND,
+            "audios/${cdr.callRecord}",
+            "--model=turbo",
+            "--fp16=False",
+            "--language=pt",
+            "--beam_size=5",
+            "--patience=2",
+            "--output_format=json",
+            "--output_dir=transcriptions"
+        )
+        val process = ProcessBuilder(command).start()
+        process.waitFor()
+    }
+
     /**
      * Faz o download do arquivo de áudio informado no CDR a partir do PABX (IASMIN_PABX_URL)
      * e salva em `audios/<callRecord>`.
@@ -96,36 +127,30 @@ class KafkaConsumerService(
      *
      * @return Path absoluto do arquivo salvo
      */
-    private fun downloadAudio(cdr: Cdr): Path {
-        val fileName = Paths.get(cdr.callRecord).fileName.toString()
-        val targetDir = Paths.get("audios")
-        Files.createDirectories(targetDir)
-        val targetPath = targetDir.resolve(fileName)
+    private fun downloadAudio(audioName: String) {
+        val audioDirectory = Paths.get("audios")
+        Files.createDirectories(audioDirectory)
+        val transcriptionDirectory = Paths.get("transcriptions")
+        Files.createDirectories(transcriptionDirectory)
+        val audioFilePath = audioDirectory.resolve(audioName)
 
-        if (Files.exists(targetPath)) {
-            logger.info("Áudio já existe localmente, pulando download: {}", targetPath.toAbsolutePath())
-            return targetPath.toAbsolutePath()
-        }
-
-        val finalUrl = buildString {
-            append(IASMIN_PABX_URL.trimEnd('/'))
+        val fullAudioUrl = buildString {
+            append(IASMIN_PABX_URL.trim())
             append("/")
-            append(fileName)
+            append(audioName)
         }
-        logger.info("Baixando áudio do PABX: {} -> {}", finalUrl, targetPath.toAbsolutePath())
+        logger.info("Baixando áudio do PABX: {} -> {}", fullAudioUrl, audioFilePath.toAbsolutePath())
 
         // Stream da resposta direto para o arquivo para evitar carregar tudo em memória
-        restTemplate.execute(URI.create(finalUrl), HttpMethod.GET, null) { response ->
+        restTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
             val body = response.body
-            Files.newOutputStream(targetPath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+            Files.newOutputStream(audioFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                 .use { out ->
                     body.transferTo(out)
                 }
             null
         }
-
-        logger.info("Download concluído: {} ({} bytes)", targetPath.toAbsolutePath(), Files.size(targetPath))
-        return targetPath.toAbsolutePath()
+        logger.info("Download concluído: {} ({} bytes)", audioFilePath.toAbsolutePath(), Files.size(audioFilePath))
     }
 
 
