@@ -19,6 +19,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.time.Duration
+import java.util.concurrent.Executors
 
 /**
  * Serviço responsável por interagir com o Kafka e utilidades correlatas.
@@ -47,6 +48,7 @@ class KafkaConsumerService(
         .connectTimeout(Duration.ofSeconds(4))
         .readTimeout(Duration.ofSeconds(8))
         .build()
+    data class Recognition(val cdrId: Int, val segments: List<Segment>)
 
     @KafkaListener(id = "whisper-consumer", topics = ["\${kafka.topic}"], groupId = "iasmin-whisper-consumer")
     fun manageTask(@Payload message: String) {
@@ -77,11 +79,9 @@ class KafkaConsumerService(
         downloadAudio(audioNameB)
         whisper(audioNameA)
         whisper(audioNameB)
-        // - Ler JSON de saída e enviar para backend
         readTranscriptions(cdr)
+        clearAudioData(audioNameA, audioNameB)
         logger.info("Transcrição finalizada: {}", cdr.uniqueId)
-        // apagar dados no fim
-//        clearAudioData(audioNameA, audioNameB)
     }
 
     private fun readTranscriptions(cdr: Cdr) {
@@ -96,17 +96,28 @@ class KafkaConsumerService(
         logger.info("Transcrição lida: {}", cdr.uniqueId)
         logger.info("Segmentos A: {}", segmentsA.size)
         logger.info("Segmentos B: {}", segmentsB.size)
+        notifyTranscriptsToBackend(cdr, segmentsA + segmentsB)
+    }
+
+    private fun notifyTranscriptsToBackend(cdr: Cdr, segments: List<Segment>) {
+        val request = RequestEntity.post(URI("$IASMIN_BACKEND_URL/recognitions"))
+            .body(Recognition(cdr.id, segments))
+        restTemplate.exchange(request, Void::class.java)
     }
 
     private fun clearAudioData(audioNameA: String, audioNameB: String) {
-        try {
-            Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameA"))
-            Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameB"))
-            Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameA"))
-            Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameB"))
-        } catch (e: IOException) {
-            logger.error("Erro ao apagar arquivos de transcrição: {}", e.message)
+        val task = Executors.newVirtualThreadPerTaskExecutor()
+        task.submit {
+            try {
+                Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameA"))
+                Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameB"))
+                Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameA"))
+                Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameB"))
+            } catch (e: IOException) {
+                logger.error("Erro ao apagar arquivos de transcrição: {}", e.message)
+            }
         }
+        task.shutdown()
     }
 
     private fun hasTranscription(cdr: Cdr): Boolean {

@@ -142,10 +142,38 @@ class KafkaConsumerServiceHasTranscriptionTest {
             .waitFor()
     }
 
+    @Disabled
+    @Test
+    fun `enviar transcricao pro backend`() {
+        val service = KafkaConsumerService(
+            IASMIN_PABX_URL = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
+            IASMIN_BACKEND_URL = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
+            WHISPER_COMMAND = "whisper",
+            kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
+            WHISPER_AUDIOS = "whisper/audios",
+            WHISPER_TRANSCRIPTS = "whisper/transcripts"
+        )
+        val cdr = Cdr(
+            id = 2934,
+            uniqueId = "1757620718.2770",
+            callRecord = "asdasd.mp3",
+            userfield = UserfieldEnum.OUTBOUND,
+            isDeveloperInstance = false
+        )
+
+        invokeReadTranscriptions(service, cdr)
+    }
+
     private fun invokeHasTranscription(service: KafkaConsumerService, cdr: Cdr): Boolean {
         val method = KafkaConsumerService::class.java.getDeclaredMethod("hasTranscription", Cdr::class.java)
         method.isAccessible = true
         return method.invoke(service, cdr) as Boolean
+    }
+
+    private fun invokeReadTranscriptions(service: KafkaConsumerService, cdr: Cdr) {
+        val method = KafkaConsumerService::class.java.getDeclaredMethod("readTranscriptions", Cdr::class.java)
+        method.isAccessible = true
+        method.invoke(service, cdr)
     }
 
     private fun startBackend(uniqueId: String, statusCode: Int): String {
