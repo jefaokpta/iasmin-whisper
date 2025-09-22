@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
 import java.io.IOException
 import java.net.URI
+import java.net.http.HttpTimeoutException
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -100,9 +101,13 @@ class KafkaConsumerService(
     }
 
     private fun notifyTranscriptsToBackend(cdr: Cdr, segments: List<Segment>) {
-        val request = RequestEntity.post(URI("$IASMIN_BACKEND_URL/recognitions"))
-            .body(Recognition(cdr.id, segments))
-        restTemplate.exchange(request, Void::class.java)
+        try {
+            val request = RequestEntity.post(URI("$IASMIN_BACKEND_URL/recognitions"))
+                .body(Recognition(cdr.id, segments))
+            restTemplate.exchange(request, Void::class.java)
+        } catch (e: HttpTimeoutException) {
+            logger.error("Timeout ao notificar transcrições para o backend: {}", e.message)
+        }
     }
 
     private fun clearAudioData(audioNameA: String, audioNameB: String) {
