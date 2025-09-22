@@ -14,13 +14,11 @@ import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.ResourceAccessException
-import java.io.IOException
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.time.Duration
-import java.util.concurrent.Executors
 
 /**
  * Serviço responsável por interagir com o Kafka e utilidades correlatas.
@@ -80,12 +78,11 @@ class KafkaConsumerService(
         downloadAudio(audioNameB)
         whisper(audioNameA)
         whisper(audioNameB)
-        readTranscriptions(cdr)
-        clearAudioData(audioNameA, audioNameB)
+        notifyTranscriptsToBackend(cdr, readTranscriptions(cdr))
         logger.info("Transcrição finalizada: {}", cdr.uniqueId)
     }
 
-    private fun readTranscriptions(cdr: Cdr) {
+    private fun readTranscriptions(cdr: Cdr): List<Segment> {
         val transcriptionA = cdr.uniqueId.replace(".", "-").plus("-a.json")
         val transcriptionB = cdr.uniqueId.replace(".", "-").plus("-b.json")
         val transcriptionAPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionA")
@@ -97,7 +94,7 @@ class KafkaConsumerService(
         logger.info("Transcrição lida: {}", cdr.uniqueId)
         logger.info("Segmentos A: {}", segmentsA.size)
         logger.info("Segmentos B: {}", segmentsB.size)
-        notifyTranscriptsToBackend(cdr, segmentsA + segmentsB)
+        return segmentsA + segmentsB
     }
 
     private fun notifyTranscriptsToBackend(cdr: Cdr, segments: List<Segment>) {
@@ -108,21 +105,6 @@ class KafkaConsumerService(
         } catch (e: ResourceAccessException) {
             logger.error("Timeout ao notificar transcrições para o backend: {}", e.message)
         }
-    }
-
-    private fun clearAudioData(audioNameA: String, audioNameB: String) {
-        val task = Executors.newVirtualThreadPerTaskExecutor()
-        task.submit {
-            try {
-                Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameA"))
-                Files.deleteIfExists(Paths.get("$WHISPER_AUDIOS/$audioNameB"))
-                Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameA"))
-                Files.deleteIfExists(Paths.get("$WHISPER_TRANSCRIPTS/$audioNameB"))
-            } catch (e: IOException) {
-                logger.error("Erro ao apagar arquivos de transcrição: {}", e.message)
-            }
-        }
-        task.shutdown()
     }
 
     private fun hasTranscription(cdr: Cdr): Boolean {
