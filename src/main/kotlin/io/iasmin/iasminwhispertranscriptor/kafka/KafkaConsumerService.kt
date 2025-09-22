@@ -162,8 +162,7 @@ class KafkaConsumerService(
      * - Se o arquivo já existir localmente, não baixa novamente.
      * - Garante a criação do diretório `audios/`.
      * - Evita path traversal usando apenas o nome do arquivo (fileName).
-     *
-     * @return Path absoluto do arquivo salvo
+     * - Em caso de falha, tenta novamente no máximo 3 vezes antes de falhar definitivamente.
      */
     private fun downloadAudio(audioName: String) {
         val audioDirectory = Paths.get(WHISPER_AUDIOS)
@@ -175,21 +174,43 @@ class KafkaConsumerService(
             append("/")
             append(audioName)
         }
-        logger.info("Baixando áudio do PABX: {} -> {}", fullAudioUrl, audioFilePath.toAbsolutePath())
         val customRestTemplate = RestTemplateBuilder()
             .connectTimeout(Duration.ofSeconds(60))
-            .readTimeout(Duration.ofSeconds(300))
+            .readTimeout(Duration.ofSeconds(120))
             .build()
-        // Stream da resposta direto para o arquivo para evitar carregar tudo em memória
-        customRestTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
-            val body = response.body
-            Files.newOutputStream(audioFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-                .use { out ->
-                    body.transferTo(out)
+
+        var lastError: Exception? = null
+        val maxAttempts = 3
+        for (attempt in 1..maxAttempts) {
+            try {
+                logger.info(
+                    "Baixando áudio do PABX: {} -> {} (tentativa {}/{})",
+                    fullAudioUrl,
+                    audioFilePath.toAbsolutePath(),
+                    attempt,
+                    maxAttempts
+                )
+                // Stream da resposta direto para o arquivo para evitar carregar tudo em memória
+                customRestTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
+                    val body = response.body
+                    Files.newOutputStream(audioFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use { out ->
+                        body.transferTo(out)
+                    }
+                    null
                 }
-            null
+                logger.info("Download concluído: {} ({} bytes)", audioFilePath.toAbsolutePath(), Files.size(audioFilePath))
+                return
+            } catch (e: Exception) {
+                lastError = e
+                logger.warn("Falha ao baixar áudio (tentativa {}/{}): {}", attempt, maxAttempts, e.message)
+                // Backoff simples entre tentativas
+                if (attempt < maxAttempts) {
+                    Thread.sleep(1000L * attempt)
+                }
+            }
         }
-        logger.info("Download concluído: {} ({} bytes)", audioFilePath.toAbsolutePath(), Files.size(audioFilePath))
+        logger.error("Falha definitiva ao baixar áudio após {} tentativas: {}", maxAttempts, fullAudioUrl, lastError)
+        throw lastError ?: IllegalStateException("Falha desconhecida ao baixar áudio $fullAudioUrl")
     }
 
 
