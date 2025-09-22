@@ -13,9 +13,9 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry
 import org.springframework.messaging.handler.annotation.Payload
 import org.springframework.stereotype.Service
 import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.client.ResourceAccessException
 import java.io.IOException
 import java.net.URI
-import java.net.http.HttpTimeoutException
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -105,7 +105,7 @@ class KafkaConsumerService(
             val request = RequestEntity.post(URI("$IASMIN_BACKEND_URL/recognitions"))
                 .body(Recognition(cdr.id, segments))
             restTemplate.exchange(request, Void::class.java)
-        } catch (e: HttpTimeoutException) {
+        } catch (e: ResourceAccessException) {
             logger.error("Timeout ao notificar transcrições para o backend: {}", e.message)
         }
     }
@@ -130,7 +130,7 @@ class KafkaConsumerService(
             val request = RequestEntity.get(URI("$IASMIN_BACKEND_URL/recognitions/${cdr.uniqueId}")).build()
             val response = restTemplate.exchange(request, Void::class.java)
             return response.statusCode == HttpStatus.OK
-        } catch (e: HttpClientErrorException) {
+        } catch (_: HttpClientErrorException) {
             return false
         }
     }
@@ -176,9 +176,12 @@ class KafkaConsumerService(
             append(audioName)
         }
         logger.info("Baixando áudio do PABX: {} -> {}", fullAudioUrl, audioFilePath.toAbsolutePath())
-
+        val customRestTemplate = RestTemplateBuilder()
+            .connectTimeout(Duration.ofSeconds(60))
+            .readTimeout(Duration.ofSeconds(300))
+            .build()
         // Stream da resposta direto para o arquivo para evitar carregar tudo em memória
-        restTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
+        customRestTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
             val body = response.body
             Files.newOutputStream(audioFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                 .use { out ->
