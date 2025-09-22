@@ -1,7 +1,6 @@
 package io.iasmin.iasminwhispertranscriptor.kafka
 
 import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpHandler
 import com.sun.net.httpserver.HttpServer
 import io.iasmin.iasminwhispertranscriptor.cdr.Cdr
 import io.iasmin.iasminwhispertranscriptor.cdr.UserfieldEnum
@@ -29,12 +28,12 @@ class KafkaConsumerServiceHasTranscriptionTest {
         val uniqueId = "abc123"
         val backendUrl = startBackend(uniqueId, 200)
         val service = KafkaConsumerService(
-            IASMIN_PABX_URL = "http://example",
-            IASMIN_BACKEND_URL = backendUrl,
-            WHISPER_COMMAND = "whisper",
+            iasminPabxUrl = "http://example",
+            iasminBackendUrl = backendUrl,
+            whisperCommand = "whisper",
             kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
-            WHISPER_AUDIOS = "whisper/audios",
-            WHISPER_TRANSCRIPTS = "whisper/transcripts"
+            whisperAudios = "whisper/audios",
+            whisperTranscripts = "whisper/transcripts"
         )
         val cdr = Cdr(id = 1, uniqueId = uniqueId, callRecord = "file.mp3", userfield = UserfieldEnum.OUTBOUND)
 
@@ -48,12 +47,12 @@ class KafkaConsumerServiceHasTranscriptionTest {
         val uniqueId = "def456"
         val backendUrl = startBackend(uniqueId, 404)
         val service = KafkaConsumerService(
-            IASMIN_PABX_URL = "http://example",
-            IASMIN_BACKEND_URL = backendUrl,
-            WHISPER_COMMAND = "whisper",
+            iasminPabxUrl = "http://example",
+            iasminBackendUrl = backendUrl,
+            whisperCommand = "whisper",
             kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
-            WHISPER_AUDIOS = "whisper/audios",
-            WHISPER_TRANSCRIPTS = "whisper/transcripts"
+            whisperAudios = "whisper/audios",
+            whisperTranscripts = "whisper/transcripts"
         )
         val cdr = Cdr(id = 2, uniqueId = uniqueId, callRecord = "file2.mp3", userfield = UserfieldEnum.INBOUND)
 
@@ -146,12 +145,12 @@ class KafkaConsumerServiceHasTranscriptionTest {
     @Test
     fun `enviar transcricao pro backend`() {
         val service = KafkaConsumerService(
-            IASMIN_PABX_URL = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
-            IASMIN_BACKEND_URL = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
-            WHISPER_COMMAND = "whisper",
+            iasminPabxUrl = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
+            iasminBackendUrl = "https://typedwebhook.tools/webhook/5fb4617e-3548-42c2-ac1f-bb0fbc694657",
+            whisperCommand = "whisper",
             kafkaListenerEndpointRegistry = Mockito.mock(KafkaListenerEndpointRegistry::class.java),
-            WHISPER_AUDIOS = "whisper/audios",
-            WHISPER_TRANSCRIPTS = "whisper/transcripts"
+            whisperAudios = "whisper/audios",
+            whisperTranscripts = "whisper/transcripts"
         )
         val cdr = Cdr(
             id = 2934,
@@ -178,9 +177,9 @@ class KafkaConsumerServiceHasTranscriptionTest {
 
     private fun startBackend(uniqueId: String, statusCode: Int): String {
         val server = HttpServer.create(InetSocketAddress(0), 0)
-        server.createContext("/recognitions/$uniqueId", HttpHandler { exchange: HttpExchange ->
+        server.createContext("/recognitions/$uniqueId") { exchange: HttpExchange ->
             handleRecognition(exchange, statusCode)
-        })
+        }
         server.start()
         this.server = server
         val port = server.address.port

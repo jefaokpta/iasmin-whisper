@@ -30,15 +30,15 @@ import java.time.Duration
 @Service
 class KafkaConsumerService(
     @param:Value("\${iasmin.pabx.url}")
-    private val IASMIN_PABX_URL: String,
+    private val iasminPabxUrl: String,
     @param:Value("\${iasmin.backend.url}")
-    private val IASMIN_BACKEND_URL: String,
+    private val iasminBackendUrl: String,
     @param:Value("\${whisper.command}")
-    private val WHISPER_COMMAND: String,
+    private val whisperCommand: String,
     @param:Value("\${whisper.audios}")
-    private val WHISPER_AUDIOS: String,
+    private val whisperAudios: String,
     @param:Value("\${whisper.transcripts}")
-    private val WHISPER_TRANSCRIPTS: String,
+    private val whisperTranscripts: String,
     @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry
 ) {
@@ -85,21 +85,20 @@ class KafkaConsumerService(
     private fun readTranscriptions(cdr: Cdr): List<Segment> {
         val transcriptionA = cdr.uniqueId.replace(".", "-").plus("-a.json")
         val transcriptionB = cdr.uniqueId.replace(".", "-").plus("-b.json")
-        val transcriptionAPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionA")
-        val transcriptionBPath = Paths.get("$WHISPER_TRANSCRIPTS/$transcriptionB")
+        val transcriptionAPath = Paths.get("$whisperTranscripts/$transcriptionA")
+        val transcriptionBPath = Paths.get("$whisperTranscripts/$transcriptionB")
         val jsonA = Files.readString(transcriptionAPath)
         val jsonB = Files.readString(transcriptionBPath)
         val segmentsA = Segment.fromWhisperJson(jsonA, CallLegEnum.A)
         val segmentsB = Segment.fromWhisperJson(jsonB, CallLegEnum.B)
-        logger.info("Transcrição lida: {}", cdr.uniqueId)
-        logger.info("Segmentos A: {}", segmentsA.size)
-        logger.info("Segmentos B: {}", segmentsB.size)
+        logger.info("${cdr.uniqueId} >> Segmentos A: {}", segmentsA.size)
+        logger.info("${cdr.uniqueId} >> Segmentos B: {}", segmentsB.size)
         return segmentsA + segmentsB
     }
 
     private fun notifyTranscriptsToBackend(cdr: Cdr, segments: List<Segment>) {
         try {
-            val request = RequestEntity.post(URI("$IASMIN_BACKEND_URL/recognitions"))
+            val request = RequestEntity.post(URI("$iasminBackendUrl/recognitions"))
                 .body(Recognition(cdr.id, segments))
             restTemplate.exchange(request, Void::class.java)
         } catch (e: ResourceAccessException) {
@@ -109,7 +108,7 @@ class KafkaConsumerService(
 
     private fun hasTranscription(cdr: Cdr): Boolean {
         try {
-            val request = RequestEntity.get(URI("$IASMIN_BACKEND_URL/recognitions/${cdr.uniqueId}")).build()
+            val request = RequestEntity.get(URI("$iasminBackendUrl/recognitions/${cdr.uniqueId}")).build()
             val response = restTemplate.exchange(request, Void::class.java)
             return response.statusCode == HttpStatus.OK
         } catch (_: HttpClientErrorException) {
@@ -118,7 +117,7 @@ class KafkaConsumerService(
     }
 
     private fun whisper(audioName: String) {
-        val command = WHISPER_COMMAND.split(" ").toTypedArray().toMutableList()
+        val command = whisperCommand.split(" ").toTypedArray().toMutableList()
         val params = listOf(
             "audios/$audioName",
             "--model=turbo",
@@ -147,12 +146,12 @@ class KafkaConsumerService(
      * - Em caso de falha, tenta novamente no máximo 3 vezes antes de falhar definitivamente.
      */
     private fun downloadAudio(audioName: String) {
-        val audioDirectory = Paths.get(WHISPER_AUDIOS)
+        val audioDirectory = Paths.get(whisperAudios)
         Files.createDirectories(audioDirectory)
         val audioFilePath = audioDirectory.resolve(audioName)
 
         val fullAudioUrl = buildString {
-            append(IASMIN_PABX_URL.trim())
+            append(iasminPabxUrl.trim())
             append("/")
             append(audioName)
         }
