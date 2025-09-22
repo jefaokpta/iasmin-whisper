@@ -1,0 +1,21 @@
+[Unit]
+Description=Transcreve audios e envia segmentos pro backend iasmin
+After=network.target
+#StartLimitIntervalSec=300
+#StartLimitBurst=5
+
+[Service]
+StandardOutput=journal
+StandardError=journal
+#StandardOutput=null
+WorkingDirectory=/opt/iasmin-whisper
+ExecStart=/opt/jdk-21/bin/java -jar iasmin-whisper.jar
+## "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1",
+SuccessExitStatus=143
+#Restart=always
+#RestartSec=30
+
+EnvironmentFile=/opt/iasmin-whisper/.env
+
+[Install]
+WantedBy=multi-user.target

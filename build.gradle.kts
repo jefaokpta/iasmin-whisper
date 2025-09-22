@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.iasmin"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 description = "iasmin-whisper-transcriptor"
 
 java {
