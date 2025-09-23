@@ -179,7 +179,8 @@ class KafkaConsumerService(
                     }
                     null
                 }
-                logger.info("Download concluído: {} ({} bytes)", audioFilePath.toAbsolutePath(), Files.size(audioFilePath))
+                val fileSizeKiB = String.format("%.2f", Files.size(audioFilePath) / 1024.0)
+                logger.info("Download concluído: {} ({} KiB)", audioFilePath.toAbsolutePath(), fileSizeKiB)
                 return
             } catch (e: Exception) {
                 lastError = e
