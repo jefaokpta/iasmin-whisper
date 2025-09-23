@@ -2,6 +2,7 @@ package io.iasmin.iasminwhispertranscriptor.kafka
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.iasmin.iasminwhispertranscriptor.cdr.Cdr
+import io.iasmin.iasminwhispertranscriptor.cdr.UserfieldEnum
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.client.RestTemplateBuilder
@@ -63,12 +64,19 @@ class KafkaConsumerService(
         val container = kafkaListenerEndpointRegistry.getListenerContainer("whisper-consumer")!!
         try {
             container.pause()
+            if (cdr.userfield == UserfieldEnum.UPLOAD) return transcriptUpload(cdr)
             transcriptAudio(cdr)
         } catch (e: Exception) {
             logger.error("Falha ao processar mensagem do Kafka ${cdr.uniqueId}", e)
         } finally {
             container.resume()
         }
+    }
+
+    private fun transcriptUpload(cdr: Cdr) {
+        downloadAudio(cdr.callRecord, true)
+        whisper(cdr.callRecord)
+        notifyTranscriptsToBackend(cdr, readUploadTranscription(cdr.callRecord))
     }
 
     private fun transcriptAudio(cdr: Cdr) {
@@ -80,6 +88,14 @@ class KafkaConsumerService(
         whisper(audioNameB)
         notifyTranscriptsToBackend(cdr, readTranscriptions(cdr))
         logger.info("Transcrição finalizada: {}", cdr.uniqueId)
+    }
+
+    private fun readUploadTranscription(audioName: String): List<Segment> {
+        val transcription = Paths.get("$whisperTranscripts/${audioName.replace(".mp3", ".json")}")
+        val json = Files.readString(transcription)
+        val segments = Segment.fromWhisperJson(json, CallLegEnum.BOTH)
+        logger.info("$audioName >> Segmentos: {}", segments.size)
+        return segments
     }
 
     private fun readTranscriptions(cdr: Cdr): List<Segment> {
@@ -145,7 +161,7 @@ class KafkaConsumerService(
      * - Evita path traversal usando apenas o nome do arquivo (fileName).
      * - Em caso de falha, tenta novamente no máximo 3 vezes antes de falhar definitivamente.
      */
-    private fun downloadAudio(audioName: String) {
+    private fun downloadAudio(audioName: String, isUpload: Boolean = false) {
         val audioDirectory = Paths.get(whisperAudios)
         Files.createDirectories(audioDirectory)
         val audioFilePath = audioDirectory.resolve(audioName)
@@ -153,6 +169,7 @@ class KafkaConsumerService(
         val fullAudioUrl = buildString {
             append(iasminPabxUrl.trim())
             append("/")
+            if (isUpload) append("mp3s/")
             append(audioName)
         }
         val customRestTemplate = RestTemplateBuilder()
