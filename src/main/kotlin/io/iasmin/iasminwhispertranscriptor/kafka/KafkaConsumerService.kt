@@ -165,11 +165,11 @@ class KafkaConsumerService(
         for (attempt in 1..maxAttempts) {
             try {
                 logger.info(
-                    "Baixando áudio do PABX: {} -> {} (tentativa {}/{})",
-                    fullAudioUrl,
-                    audioFilePath.toAbsolutePath(),
+                    "Baixando áudio do PABX (tentativa {}/{}): {} -> {}",
                     attempt,
-                    maxAttempts
+                    maxAttempts,
+                    fullAudioUrl,
+                    audioFilePath.toAbsolutePath()
                 )
                 // Stream da resposta direto para o arquivo para evitar carregar tudo em memória
                 customRestTemplate.execute(URI.create(fullAudioUrl), HttpMethod.GET, null) { response ->
